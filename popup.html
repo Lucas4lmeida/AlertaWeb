@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlertaWeb</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ HEADER ============ -->
+    <header class="header">
+      <div class="header-brand">
+        <svg class="header-logo" viewBox="0 0 28 28" fill="none">
+          <path d="M14 2L3 7.5V13.5C3 20.1 7.7 26.2 14 28C20.3 26.2 25 20.1 25 13.5V7.5L14 2Z" fill="currentColor" opacity="0.15"/>
+          <path d="M14 2L3 7.5V13.5C3 20.1 7.7 26.2 14 28C20.3 26.2 25 20.1 25 13.5V7.5L14 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M10 14.5L12.5 17L18 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <h1 class="header-title">AlertaWeb</h1>
+          <p class="header-subtitle">Detector de Golpes</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-history" class="icon-btn" title="Histórico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="Configurações">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ============ TELA PRINCIPAL ============ -->
+    <section id="view-main" class="view active">
+      <div class="site-info" id="site-info">
+        <span class="site-favicon" id="site-favicon"></span>
+        <div class="site-details">
+          <span class="site-domain" id="site-domain">Carregando...</span>
+          <span class="site-url" id="site-url"></span>
+        </div>
+      </div>
+
+      <button id="btn-analyze" class="btn-analyze">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Analisar esta Página
+      </button>
+
+      <!-- Loading State -->
+      <div id="loading-state" class="loading-state hidden">
+        <div class="loading-ring">
+          <div></div><div></div><div></div><div></div>
+        </div>
+        <p class="loading-text">Analisando página...</p>
+        <div class="loading-steps" id="loading-steps">
+          <span class="step active">URL</span>
+          <span class="step">Conteúdo</span>
+          <span class="step">Segurança</span>
+          <span class="step">Domínio</span>
+          <span class="step">VirusTotal</span>
+          <span class="step">IA</span>
+        </div>
+      </div>
+
+      <!-- Resultado da Análise -->
+      <div id="result-container" class="result-container hidden">
+        <!-- Score circular -->
+        <div class="score-section">
+          <div class="score-ring" id="score-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
+              <circle class="score-ring-fill" id="score-ring-fill" cx="60" cy="60" r="52"
+                stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+            </svg>
+            <div class="score-value">
+              <span class="score-number" id="score-number">0</span>
+              <span class="score-label">/ 100</span>
+            </div>
+          </div>
+          <div class="risk-badge" id="risk-badge">Analisando...</div>
+        </div>
+
+        <!-- Resumo IA -->
+        <div class="ai-summary hidden" id="ai-summary">
+          <div class="ai-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+              <path d="M18 14a6 6 0 0 1-12 0"/>
+              <path d="M12 20v2"/>
+              <path d="M8 22h8"/>
+            </svg>
+            Análise por IA
+          </div>
+          <p class="ai-text" id="ai-text"></p>
+          <p class="ai-recommendation" id="ai-recommendation"></p>
+        </div>
+
+        <!-- Breakdown de scores -->
+        <div class="breakdown-section">
+          <h3 class="section-title">Análise Detalhada</h3>
+          <div class="breakdown-bars" id="breakdown-bars"></div>
+        </div>
+
+        <!-- Findings -->
+        <div class="findings-section">
+          <h3 class="section-title">Descobertas</h3>
+          <div class="findings-list" id="findings-list"></div>
+        </div>
+
+        <!-- Ações -->
+        <div class="actions-section">
+          <button id="btn-report" class="btn-action btn-report-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+              <line x1="4" y1="22" x2="4" y2="15"/>
+            </svg>
+            Reportar Site
+          </button>
+          <button id="btn-reanalyze" class="btn-action btn-reanalyze-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Reanalisar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TELA DE CONFIGURAÇÕES ============ -->
+    <section id="view-settings" class="view">
+      <div class="view-header">
+        <button id="btn-back-settings" class="icon-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+        </button>
+        <h2 class="view-title">Configurações</h2>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="settings-label">Chaves de API</h3>
+        <p class="settings-hint">Insira suas chaves para habilitar verificações avançadas. Suas chaves ficam salvas localmente.</p>
+
+        <div class="input-group">
+          <label for="api-gemini">Gemini API (análise IA)</label>
+          <input type="password" id="api-gemini" placeholder="AIza..." autocomplete="off"/>
+          <span class="input-hint">Gratuito — obtenha em aistudio.google.com/apikey</span>
+        </div>
+
+        <div class="input-group">
+          <label for="api-whois">IP2WHOIS (domínio)</label>
+          <input type="password" id="api-whois" placeholder="Sua chave IP2WHOIS..." autocomplete="off"/>
+          <span class="input-hint">Gratuito — obtenha em ip2whois.com</span>
+        </div>
+
+        <div class="input-group">
+          <label for="api-safebrowsing">Google Safe Browsing</label>
+          <input type="password" id="api-safebrowsing" placeholder="AIza..." autocomplete="off"/>
+          <span class="input-hint">Gratuito — obtenha em console.cloud.google.com</span>
+        </div>
+
+        <div class="input-group">
+          <label for="api-virustotal">VirusTotal</label>
+          <input type="password" id="api-virustotal" placeholder="Sua chave VirusTotal..." autocomplete="off"/>
+          <span class="input-hint">Gratuito (500/dia) — obtenha em virustotal.com/gui/my-apikey</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 class="settings-label">Comportamento</h3>
+        <div class="toggle-row">
+          <span>Mostrar notificações</span>
+          <label class="toggle">
+            <input type="checkbox" id="setting-notifications" checked/>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <button id="btn-save-settings" class="btn-primary">Salvar Configurações</button>
+    </section>
+
+    <!-- ============ TELA DE HISTÓRICO ============ -->
+    <section id="view-history" class="view">
+      <div class="view-header">
+        <button id="btn-back-history" class="icon-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+        </button>
+        <h2 class="view-title">Histórico</h2>
+        <button id="btn-clear-history" class="icon-btn" title="Limpar histórico" style="margin-left:auto;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="history-list" id="history-list">
+        <p class="empty-state">Nenhuma análise realizada ainda.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
