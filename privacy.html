@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — AlertaWeb</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0f1a;
+      --surface:   #111827;
+      --border:    #1e2d45;
+      --accent:    #3b82f6;
+      --accent-dim:#1d4ed8;
+      --text:      #e2e8f0;
+      --muted:     #8899b0;
+      --success:   #22c55e;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 0;
+    }
+    .header-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .shield {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+    }
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .brand p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── MAIN ── */
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    .page-meta {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 3rem;
+    }
+
+    /* ── SUMMARY BOX ── */
+    .summary {
+      background: #0f1e35;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .summary p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .summary strong {
+      color: var(--text);
+    }
+
+    /* ── SECTIONS ── */
+    section {
+      margin-bottom: 2.5rem;
+    }
+    h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    p {
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+    }
+    p:last-child { margin-bottom: 0; }
+
+    /* ── PERMISSION CARDS ── */
+    .perm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .perm {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0 1rem;
+      align-items: start;
+    }
+    .perm-tag {
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 0.78rem;
+      color: #93c5fd;
+      background: #1e3a5f;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      margin-top: 3px;
+    }
+    .perm-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── API TABLE ── */
+    .api-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .api-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .api-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+    .api-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    /* ── BADGE ROW ── */
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: #0f2e1a;
+      color: var(--success);
+      border: 1px solid #166534;
+    }
+    .badge::before {
+      content: '✓';
+      font-weight: 700;
+    }
+
+    /* ── CONTACT ── */
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+    }
+    .contact-box p { margin-bottom: 0.5rem; }
+    .contact-box a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .contact-box a:hover { text-decoration: underline; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 500px) {
+      .perm { grid-template-columns: 1fr; gap: 0.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <svg class="shield" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M22 4L6 10V22C6 31.4 13.2 40.2 22 42C30.8 40.2 38 31.4 38 22V10L22 4Z" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+      <path d="M15 22L20 27L29 17" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="brand">
+      <h1>AlertaWeb</h1>
+      <p>Detector de Golpes</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">Política de Privacidade</h1>
+  <p class="page-meta">Última atualização: junho de 2026</p>
+
+  <div class="summary">
+    <p>
+      O AlertaWeb foi desenvolvido com <strong>privacidade como princípio central</strong>.
+      A extensão não coleta dados pessoais, não rastreia o usuário e não vende
+      nem compartilha informações com terceiros para fins comerciais.
+      Toda análise é realizada <strong>localmente no navegador do usuário</strong>.
+    </p>
+  </div>
+
+  <!-- 1 -->
+  <section>
+    <h2>1. Quem somos</h2>
+    <p>
+      O AlertaWeb é uma extensão para o Google Chrome desenvolvida de forma independente,
+      com o objetivo único de ajudar usuários a identificar sites fraudulentos, golpes de
+      phishing e domínios suspeitos durante a navegação.
+    </p>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <h2>2. Propósito único da extensão</h2>
+    <p>
+      A extensão tem um único propósito: analisar o domínio da página ativa e alertar o
+      usuário caso o site apresente características de golpe, fraude ou phishing. Isso é
+      feito por meio de heurísticas locais, listas de domínios confiáveis e suspeitos,
+      e consulta opcional a APIs de verificação de segurança.
+    </p>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <h2>3. Dados coletados</h2>
+    <p>
+      O AlertaWeb <strong style="color: var(--text);">não coleta dados pessoais</strong>.
+      As únicas informações processadas são:
+    </p>
+    <div class="perm-list" style="margin-top: 0.75rem;">
+      <div class="perm">
+        <span class="perm-tag">URL / Domínio</span>
+        <span class="perm-desc">Analisado localmente para verificar se o site é seguro. Nunca armazenado em servidores externos.</span>
+      </div>
+      <div class="perm">
+        <span class="perm-tag">Conteúdo da página</span>
+        <span class="perm-desc">Texto e links extraídos localmente para detectar padrões de phishing. Não é transmitido externamente, salvo para as APIs listadas abaixo (apenas o domínio/URL, nunca o conteúdo pessoal).</span>
+      </div>
+      <div class="perm">
+        <span class="perm-tag">Preferências do usuário</span>
+        <span class="perm-desc">Configurações da extensão e histórico de análises, armazenados localmente via <code>chrome.storage</code>. Não saem do dispositivo.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <h2>4. Permissões utilizadas</h2>
+    <div class="perm-list">
+      <div class="perm">
+        <span class="perm-tag">activeTab</span>
+        <span class="perm-desc">Permite ler o URL da aba ativa no momento em que o usuário aciona a análise. Não acessa outras abas.</span>
+      </div>
+      <div class="perm">
+        <span class="perm-tag">scripting</span>
+        <span class="perm-desc">Utilizado para injetar indicadores visuais na página atual quando um site suspeito é detectado, alertando o usuário diretamente durante a navegação.</span>
+      </div>
+      <div class="perm">
+        <span class="perm-tag">storage</span>
+        <span class="perm-desc">Armazena localmente preferências do usuário, histórico de sites analisados e listas de domínios. Os dados ficam exclusivamente no dispositivo.</span>
+      </div>
+      <div class="perm">
+        <span class="perm-tag">host_permissions</span>
+        <span class="perm-desc">Necessário para verificar o domínio de qualquer site visitado, comparando-o com listas de domínios confiáveis e suspeitos. Também permite o funcionamento do scanner em webmails (Gmail, Outlook, Yahoo).</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <h2>5. Scanner de emails</h2>
+    <p>
+      Em clientes de webmail (Gmail, Outlook, Yahoo Mail), a extensão analisa links
+      presentes nos emails abertos pelo usuário para identificar possíveis tentativas de
+      phishing. Essa análise é feita <strong style="color: var(--text);">inteiramente no
+      dispositivo do usuário</strong> — nenhum conteúdo de email é transmitido para
+      servidores externos.
+    </p>
+  </section>
+
+  <!-- 6 -->
+  <section>
+    <h2>6. APIs externas consultadas</h2>
+    <p>
+      Para aprimorar a precisão das análises, a extensão pode consultar as seguintes
+      APIs. Apenas o domínio ou URL da página é enviado — nunca dados pessoais do usuário.
+    </p>
+    <div class="api-list" style="margin-top: 0.75rem;">
+      <div class="api-item">
+        <p class="api-name">Google Safe Browsing API</p>
+        <p class="api-desc">Verifica se o domínio consta na lista de sites maliciosos do Google. Apenas a URL é enviada.</p>
+      </div>
+      <div class="api-item">
+        <p class="api-name">VirusTotal API</p>
+        <p class="api-desc">Consulta a reputação do domínio em múltiplos mecanismos antivírus. Apenas o domínio é enviado.</p>
+      </div>
+      <div class="api-item">
+        <p class="api-name">IP2WHOIS API</p>
+        <p class="api-desc">Obtém dados de registro do domínio (data de criação, registrante) para verificar domínios recentes. Apenas o domínio é enviado.</p>
+      </div>
+      <div class="api-item">
+        <p class="api-name">Google Gemini API</p>
+        <p class="api-desc">Utilizada para análise heurística avançada de conteúdo de páginas suspeitas. Fragmentos de texto da página (sem dados pessoais) podem ser enviados para análise. Nenhum código executável é recebido — a resposta é sempre texto ou JSON com score de risco.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section>
+    <h2>7. O que não fazemos</h2>
+    <div class="badge-row">
+      <span class="badge">Não vendemos dados</span>
+      <span class="badge">Não rastreamos o usuário</span>
+      <span class="badge">Não exibimos anúncios</span>
+      <span class="badge">Não coletamos dados pessoais</span>
+      <span class="badge">Não compartilhamos com terceiros</span>
+      <span class="badge">Não transmitimos conteúdo de emails</span>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section>
+    <h2>8. Armazenamento local</h2>
+    <p>
+      O histórico de análises e as configurações da extensão são armazenados localmente
+      no navegador do usuário via <code style="color: #93c5fd; background: #1e3a5f; padding: 1px 6px; border-radius: 3px;">chrome.storage.local</code>.
+      O usuário pode apagar esses dados a qualquer momento nas configurações da extensão
+      ou removendo-a do Chrome.
+    </p>
+  </section>
+
+  <!-- 9 -->
+  <section>
+    <h2>9. Menores de idade</h2>
+    <p>
+      O AlertaWeb não coleta dados de nenhuma pessoa, independentemente da idade.
+      A extensão não é direcionada a menores de 13 anos e não solicita qualquer
+      informação pessoal.
+    </p>
+  </section>
+
+  <!-- 10 -->
+  <section>
+    <h2>10. Alterações nesta política</h2>
+    <p>
+      Eventuais atualizações serão publicadas nesta página com a data de revisão atualizada.
+      O uso continuado da extensão após a publicação de alterações implica concordância
+      com a nova política.
+    </p>
+  </section>
+
+  <!-- 11 -->
+  <section>
+    <h2>11. Contato</h2>
+    <div class="contact-box">
+      <p>Dúvidas ou solicitações relacionadas à privacidade podem ser enviadas para:</p>
+      <p><a href="mailto:contato@alertaweb.com.br">contato@alertaweb.com.br</a></p>
+      <p style="margin-top: 0.75rem; font-size: 0.875rem;">
+        Repositório público:
+        <a href="https://github.com/Lucas4lmeida/AlertaWeb" target="_blank" rel="noopener">
+          github.com/Lucas4lmeida/AlertaWeb
+        </a>
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  &copy; 2026 AlertaWeb — Detector de Golpes
+</footer>
+
+</body>
+</html>
