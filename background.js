@@ -1,9 +1,12 @@
 // ============================================================================
-// AlertaWeb — Background Service Worker (AUDITED)
+// AlertaWeb — Background Service Worker
 // Motor de análise principal com verificações multi-camada
 // ============================================================================
 
 'use strict';
+
+// Carregar chaves embutidas (se existirem)
+try { importScripts('keys.js'); } catch { /* keys.js é opcional */ }
 
 const CONFIG = {
   CACHE_DURATION_MS: 30 * 60 * 1000,
@@ -92,11 +95,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'checkEmailLinks') {
+    checkEmailLinksWithAPIs(request.urls)
+      .then(results => sendResponse({ success: true, results }))
+      .catch(() => sendResponse({ success: false }));
+    return true;
+  }
+
+  if (request.action === 'analyzeEmailWithAPIs') {
+    analyzeEmailFullWithAPIs(request.emailData)
+      .then(result => sendResponse({ success: true, result }))
+      .catch(e => sendResponse({ success: false, error: e.message }));
+    return true;
+  }
+
   if (request.action === 'getCachedResult') {
     getCachedAnalysis(request.url).then(result => {
       if (result) sendResponse({ success: true, result });
       else sendResponse({ success: false });
-    });
+    }).catch(() => sendResponse({ success: false }));
     return true;
   }
 });
@@ -114,24 +131,23 @@ async function handleAnalysis(tabId, forceReanalyze = false) {
     throw new Error('Não foi possível extrair dados da página.');
   }
 
-  // Cache: pular se forceReanalyze
   if (!forceReanalyze) {
     const cached = await getCachedAnalysis(pageData.url);
     if (cached) return cached;
   }
 
-  // ====== WHITELIST: domínios inquestionavelmente legítimos ======
+  // ====== WHITELIST ======
   const domainInfo = classifyDomain(pageData.domain);
 
   if (domainInfo.whitelisted) {
     const result = {
       url: pageData.url, domain: pageData.domain, title: pageData.title,
-      score: 0, riskLevel: 'safe',
-      riskLabel: 'SEGURO — Site Confiável',
+      riskLevel: 'seguro',
+      riskLabel: 'Seguro',
       riskColor: '#16a34a',
-      findings: [{ severity: 'positive', message: `Domínio "${pageData.domain}" é reconhecido como site legítimo e confiável.` }],
-      aiSummary: null, aiRecommendation: null,
-      breakdown: { url: 0, content: 0, domain: 0, security: 0, forms: 0, external: 0, virusTotal: 0, ai: 0 },
+      summary: `O domínio "${pageData.domain}" é reconhecido como um site legítimo e confiável.`,
+      findings: [{ severity: 'positive', message: 'Site presente na lista de domínios confiáveis.' }],
+      apisUsed: ['whitelist'],
       timestamp: Date.now()
     };
     await setCachedAnalysis(pageData.url, result);
@@ -139,15 +155,12 @@ async function handleAnalysis(tabId, forceReanalyze = false) {
     return result;
   }
 
-  // Passar flags de contexto para as análises
-  pageData._context = {
-    isUGC: domainInfo.isUGC,             // conteúdo gerado por usuários
-    isCommercial: domainInfo.isCommercial // parece site comercial
-  };
+  pageData._context = { isUGC: domainInfo.isUGC, isCommercial: domainInfo.isCommercial };
 
+  // ====== FASE 1: Rodar heurísticas + APIs em paralelo (tudo MENOS Gemini) ======
   const [
     urlAnalysis, contentAnalysis, domainAnalysis, securityAnalysis,
-    formAnalysis, externalChecks, virusTotalCheck, aiAnalysis
+    formAnalysis, externalChecks, virusTotalCheck
   ] = await Promise.allSettled([
     analyzeURL(pageData),
     analyzeContent(pageData),
@@ -155,11 +168,11 @@ async function handleAnalysis(tabId, forceReanalyze = false) {
     analyzeSecurity(pageData),
     analyzeForms(pageData),
     runExternalChecks(pageData, apiKeys),
-    runVirusTotalCheck(pageData, apiKeys),
-    runAIAnalysis(pageData, apiKeys)
+    runVirusTotalCheck(pageData, apiKeys)
   ]);
 
-  const result = consolidateResults({
+  // Coletar todos os dados
+  const allData = {
     url: pageData.url,
     domain: pageData.domain,
     title: pageData.title,
@@ -169,10 +182,11 @@ async function handleAnalysis(tabId, forceReanalyze = false) {
     securityAnalysis: getSettledValue(securityAnalysis),
     formAnalysis: getSettledValue(formAnalysis),
     externalChecks: getSettledValue(externalChecks),
-    virusTotalCheck: getSettledValue(virusTotalCheck),
-    aiAnalysis: getSettledValue(aiAnalysis),
-    timestamp: Date.now()
-  });
+    virusTotalCheck: getSettledValue(virusTotalCheck)
+  };
+
+  // ====== FASE 2: Enviar dossiê completo ao Gemini para veredito final ======
+  const result = await buildFinalJudgment(allData, apiKeys);
 
   await setCachedAnalysis(pageData.url, result);
   saveToHistory(result);
@@ -974,6 +988,152 @@ async function runVirusTotalCheck(pageData, apiKeys) {
 }
 
 // ============================================================================
+// VERIFICAÇÃO DE LINKS DE EMAIL (usado pelo email-scanner.js)
+// ============================================================================
+
+async function checkEmailLinksWithAPIs(urls) {
+  const settings = await getSettings();
+  const apiKeys = settings.apiKeys || {};
+
+  // Verificar todos os links em PARALELO (não sequencial)
+  const checks = urls.map(url => checkSingleLink(url, apiKeys));
+  const settled = await Promise.allSettled(checks);
+
+  return settled.map((s, i) => s.status === 'fulfilled' ? s.value : { url: urls[i], safeBrowsing: null, virusTotal: null });
+}
+
+async function checkSingleLink(url, apiKeys) {
+  const result = { url, safeBrowsing: null, virusTotal: null };
+
+  // Fetch com timeout de 8 segundos
+  const fetchWithTimeout = (fetchUrl, options = {}, timeoutMs = 8000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(fetchUrl, { ...options, signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+  };
+
+  // Safe Browsing e VirusTotal em paralelo para cada link
+  const tasks = [];
+
+  if (apiKeys.safeBrowsing) {
+    tasks.push(
+      (async () => {
+        try {
+          result.safeBrowsing = await checkSafeBrowsing(url, apiKeys.safeBrowsing);
+        } catch { /* silenciar */ }
+      })()
+    );
+  }
+
+  if (apiKeys.virusTotal) {
+    tasks.push(
+      (async () => {
+        try {
+          const utf8Url = unescape(encodeURIComponent(url));
+          const urlId = btoa(utf8Url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          const vtResponse = await fetchWithTimeout(
+            `https://www.virustotal.com/api/v3/urls/${urlId}`,
+            { headers: { 'x-apikey': apiKeys.virusTotal, 'Accept': 'application/json' } }
+          );
+          if (vtResponse.ok) {
+            const vtData = await vtResponse.json();
+            const stats = vtData?.data?.attributes?.last_analysis_stats;
+            if (stats) {
+              result.virusTotal = { malicious: stats.malicious || 0, suspicious: stats.suspicious || 0 };
+            }
+          }
+        } catch { /* silenciar — timeout ou erro de rede */ }
+      })()
+    );
+  }
+
+  await Promise.allSettled(tasks);
+  return result;
+}
+
+// ============================================================================
+// ANÁLISE COMPLETA DE EMAIL (Links + Gemini IA)
+// ============================================================================
+
+async function analyzeEmailFullWithAPIs(emailData) {
+  const settings = await getSettings();
+  const apiKeys = settings.apiKeys || {};
+
+  const results = { linkResults: [], aiAnalysis: null };
+
+  // 1. Verificar links contra Safe Browsing + VirusTotal
+  const urls = (emailData.urls || []).slice(0, 10);
+  if (urls.length > 0) {
+    try {
+      results.linkResults = await checkEmailLinksWithAPIs(urls);
+    } catch { /* silenciar */ }
+  }
+
+  // 2. Análise por Gemini IA
+  if (apiKeys.gemini && emailData.bodyText) {
+    try {
+      const prompt = buildEmailAIPrompt(emailData);
+      const aiResult = await callGeminiForEmail(prompt, apiKeys.gemini);
+      if (aiResult) {
+        results.aiAnalysis = aiResult;
+      }
+    } catch { /* silenciar */ }
+  }
+
+  return results;
+}
+
+async function callGeminiForEmail(prompt, apiKey) {
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        if (attempt > 0) await sleep(2000);
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 600 }
+            })
+          }
+        );
+
+        if (response.status === 429) { if (attempt === 1) break; continue; }
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        if (data?.candidates?.[0]?.finishReason === 'SAFETY') return null;
+
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return parseAIResponse(text);
+      } catch { if (attempt === 1) break; }
+    }
+  }
+  return null;
+}
+
+function buildEmailAIPrompt(emailData) {
+  const linksInfo = (emailData.urls || []).slice(0, 5).join(', ') || 'nenhum';
+  const body = (emailData.bodyText || '').substring(0, 800);
+
+  return `Analise este email e diga se é phishing/golpe. Seja direto.
+
+De: ${emailData.sender || 'desconhecido'}
+Assunto: ${emailData.subject || 'sem assunto'}
+Links: ${linksInfo}
+
+Corpo:
+${body}
+
+Responda SÓ com JSON (sem markdown):
+{"riskScore":<0-100>,"summary":"<1 frase>","findings":[{"severity":"critical|high|medium|low|positive","message":"<fato>"}]}`;
+}
+
+// ============================================================================
 // ANÁLISE POR IA (Gemini API) — com retry, backoff e fallback de modelo
 // ============================================================================
 
@@ -985,234 +1145,209 @@ const GEMINI_MODELS = [
 const MAX_RETRIES = 2;
 const BASE_DELAY_MS = 3000;
 
-async function runAIAnalysis(pageData, apiKeys) {
-  if (!apiKeys.gemini) {
-    return { score: null, skipped: true, findings: [{ severity: 'info', message: 'API Gemini não configurada — configure nas settings para análise inteligente por IA.' }] };
-  }
-
-  const prompt = buildAIPrompt(pageData);
-
-  // Tentar cada modelo com retry
-  for (const model of GEMINI_MODELS) {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        // Backoff exponencial: 0s, 3s, 9s
-        if (attempt > 0) {
-          await sleep(BASE_DELAY_MS * Math.pow(3, attempt - 1));
-        }
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKeys.gemini}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
-            })
-          }
-        );
-
-        // Rate limited — retry com backoff
-        if (response.status === 429) {
-          console.log(`[AlertaWeb] Gemini ${model} rate limited (tentativa ${attempt + 1}/${MAX_RETRIES + 1})`);
-          if (attempt === MAX_RETRIES) break; // Tenta próximo modelo
-          continue;
-        }
-
-        if (!response.ok) throw new Error(`Gemini ${model} retornou status ${response.status}`);
-
-        const data = await response.json();
-
-        // Verificar se foi bloqueado por safety
-        if (data?.candidates?.[0]?.finishReason === 'SAFETY') {
-          return { score: null, skipped: true, findings: [{ severity: 'info', message: 'Análise IA bloqueada por filtro de segurança do Gemini.' }] };
-        }
-
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const aiResult = parseAIResponse(text);
-
-        if (aiResult) {
-          return {
-            score: Math.min(Math.max(aiResult.riskScore || 0, 0), 100),
-            findings: (aiResult.findings || []).map(f => ({
-              severity: f.severity || 'medium',
-              message: f.message || ''
-            })),
-            summary: aiResult.summary || '',
-            recommendation: aiResult.recommendation || ''
-          };
-        }
-
-        return { score: null, skipped: true, findings: [{ severity: 'info', message: 'Análise IA retornou formato inesperado.' }] };
-
-      } catch (error) {
-        if (attempt === MAX_RETRIES) {
-          console.log(`[AlertaWeb] Gemini ${model} falhou após ${MAX_RETRIES + 1} tentativas: ${error.message}`);
-        }
-      }
-    }
-  }
-
-  // Todos os modelos falharam
-  return {
-    score: null, skipped: true,
-    findings: [{
-      severity: 'info',
-      message: 'Análise IA indisponível (rate limit). Aguarde 1 min e reanalise, ou verifique sua quota em aistudio.google.com.'
-    }]
-  };
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// FIX #3: Parser JSON robusto — tenta parse direto, depois extrai bloco JSON com balanceamento
+// Parser JSON robusto
 function parseAIResponse(text) {
-  // Tentativa 1: texto inteiro é JSON
-  try {
-    return JSON.parse(text.trim());
-  } catch { /* não é JSON puro */ }
-
-  // Tentativa 2: Encontrar o primeiro bloco JSON balanceado começando com { "riskScore"
-  // Isso evita o bug do regex greedy que capturava de { a } errado
+  try { return JSON.parse(text.trim()); } catch { /* */ }
   const start = text.indexOf('{');
   if (start === -1) return null;
-
   let depth = 0;
   for (let i = start; i < text.length; i++) {
     if (text[i] === '{') depth++;
-    else if (text[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(text.substring(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
-    }
+    else if (text[i] === '}') { depth--; if (depth === 0) { try { return JSON.parse(text.substring(start, i + 1)); } catch { return null; } } }
   }
   return null;
 }
 
-function buildAIPrompt(pageData) {
-  // Compactar forms para economizar tokens
-  const formsCompact = pageData.forms.length > 0
-    ? pageData.forms.map(f => `${f.method} ${f.sensitiveFields.join(',')||'none'} ext:${f.submitsExternally}`).join('; ')
-    : 'nenhum';
-
-  // Limitar amostra de texto a 1000 chars
-  const textSample = (pageData.text.sample || '').substring(0, 1000);
-
-  return `Analise esta página web e diga se é golpe. Foco em golpes brasileiros, BETs falsas (convide e ganhe, Fortune Tiger, R$x20, login diário, sem licença LOTERJ/SPA-MF).
-
-URL: ${pageData.url}
-Título: ${pageData.title}
-HTTPS: ${pageData.security.isHTTPS}
-Forms: ${formsCompact}
-Links: ${pageData.links.total} total, ${pageData.links.suspicious} suspeitos
-Urgência: ${pageData.text.hasUrgencyLanguage.count} termos
-Garantias: ${pageData.text.hasGuaranteePatterns.count} termos
-Countdown: ${pageData.suspiciousPatterns.hasCountdownTimers}
-Typosquatting: ${pageData.suspiciousPatterns.domainTyposquatting.detected}
-Contato: ${pageData.suspiciousPatterns.hasContactInfo}
-Legal: ${pageData.suspiciousPatterns.hasLegalPages}
-CNPJ: ${pageData.suspiciousPatterns.hasPhysicalAddress}
-
-Texto: ${textSample}
-
-Responda SÓ com JSON (sem markdown):
-{"riskScore":<0-100>,"summary":"<1 frase>","recommendation":"<1 frase>","findings":[{"severity":"critical|high|medium|low|positive","message":"<fato>"}]}`;
-}
-
 // ============================================================================
-// CONSOLIDAÇÃO DE RESULTADOS
+// JULGAMENTO FINAL — Gemini como analista sênior, heurísticas como fallback
 // ============================================================================
 
-function consolidateResults(analyses) {
-  const weights = {
-    urlAnalysis: 0.15,
-    contentAnalysis: 0.12,
-    domainAnalysis: 0.12,
-    securityAnalysis: 0.12,
-    formAnalysis: 0.12,
-    externalChecks: 0.09,
-    virusTotalCheck: 0.18,
-    aiAnalysis: 0.10
+const RISK_LEVELS = {
+  seguro:  { label: 'Seguro',  color: '#16a34a' },
+  baixo:   { label: 'Baixo',   color: '#65a30d' },
+  medio:   { label: 'Médio',   color: '#d97706' },
+  alto:    { label: 'Alto',    color: '#ea580c' },
+  critico: { label: 'Crítico', color: '#dc2626' }
+};
+
+async function buildFinalJudgment(allData, apiKeys) {
+  // Coletar todos os findings e calcular score interno (para fallback)
+  const allFindings = [];
+  let internalScore = 0;
+  let totalWeight = 0;
+  const apisUsed = [];
+
+  const modules = {
+    urlAnalysis: 0.15, contentAnalysis: 0.15, domainAnalysis: 0.12,
+    securityAnalysis: 0.12, formAnalysis: 0.12, externalChecks: 0.15,
+    virusTotalCheck: 0.19
   };
 
-  let weightedScore = 0;
-  let totalWeight = 0;
-  const allFindings = [];
-
-  for (const [key, weight] of Object.entries(weights)) {
-    const analysis = analyses[key];
-    // CRITICAL FIX: Só incluir no peso se o módulo realmente rodou (score !== null e não skipped)
-    if (analysis && typeof analysis.score === 'number' && !analysis.error && !analysis.skipped) {
-      weightedScore += analysis.score * weight;
-      totalWeight += weight;
-    }
-    if (analysis?.findings) {
-      allFindings.push(...analysis.findings);
-    }
-  }
-
-  // Calcular a média ponderada
-  const weightedAvg = totalWeight > 0 ? Math.round(weightedScore / totalWeight) : 0;
-
-  // CRITICAL FIX: Evitar que módulos com score 0 diluam a detecção de um módulo que
-  // encontrou alto risco. Se o conteúdo da página GRITA golpe (score 80+), mas a URL
-  // e segurança parecem ok, a média cai muito. Solução: usar o maior score individual
-  // como piso proporcional.
   let maxModuleScore = 0;
-  for (const [key, weight] of Object.entries(weights)) {
-    const analysis = analyses[key];
-    if (analysis && typeof analysis.score === 'number' && !analysis.skipped) {
-      maxModuleScore = Math.max(maxModuleScore, analysis.score);
+  for (const [key, weight] of Object.entries(modules)) {
+    const m = allData[key];
+    if (m?.findings) allFindings.push(...m.findings);
+    if (m && typeof m.score === 'number' && !m.skipped) {
+      internalScore += m.score * weight;
+      totalWeight += weight;
+      maxModuleScore = Math.max(maxModuleScore, m.score);
     }
   }
 
-  // O score final é o MAIOR entre a média ponderada e 70% do pior módulo encontrado
-  const peakFloor = Math.round(maxModuleScore * 0.7);
-  const finalScore = Math.min(Math.max(weightedAvg, peakFloor), 100);
+  const weightedAvg = totalWeight > 0 ? Math.round(internalScore / totalWeight) : 0;
+  const fallbackScore = Math.min(Math.max(weightedAvg, Math.round(maxModuleScore * 0.7)), 100);
 
-  let riskLevel, riskLabel, riskColor;
-  if (finalScore >= CONFIG.RISK_THRESHOLDS.CRITICAL) {
-    riskLevel = 'critical'; riskLabel = 'CRÍTICO — Golpe Provável'; riskColor = '#dc2626';
-  } else if (finalScore >= CONFIG.RISK_THRESHOLDS.HIGH) {
-    riskLevel = 'high'; riskLabel = 'ALTO — Muito Suspeito'; riskColor = '#ea580c';
-  } else if (finalScore >= CONFIG.RISK_THRESHOLDS.MEDIUM) {
-    riskLevel = 'medium'; riskLabel = 'MÉDIO — Suspeito'; riskColor = '#d97706';
-  } else if (finalScore >= CONFIG.RISK_THRESHOLDS.LOW) {
-    riskLevel = 'low'; riskLabel = 'BAIXO — Atenção'; riskColor = '#65a30d';
+  // Registrar quais APIs rodaram
+  if (allData.externalChecks && !allData.externalChecks.skipped) apisUsed.push('Safe Browsing');
+  if (allData.virusTotalCheck && !allData.virusTotalCheck.skipped) apisUsed.push('VirusTotal');
+  if (allData.domainAnalysis && !allData.domainAnalysis.skipped) apisUsed.push('IP2WHOIS');
+
+  // ====== TENTAR GEMINI COMO ANALISTA FINAL ======
+  if (apiKeys.gemini) {
+    try {
+      const dossier = buildDossier(allData, allFindings);
+      const geminiResult = await callGeminiJudgment(dossier, apiKeys.gemini);
+
+      if (geminiResult && geminiResult.riskLevel) {
+        const level = geminiResult.riskLevel.toLowerCase();
+        const riskInfo = RISK_LEVELS[level] || RISK_LEVELS.medio;
+        apisUsed.push('Gemini IA');
+
+        // Combinar findings da IA com os das heurísticas
+        const aiFindings = (geminiResult.findings || []).map(f => ({
+          severity: f.severity || 'medium',
+          message: f.message
+        }));
+
+        return {
+          url: allData.url, domain: allData.domain, title: allData.title,
+          riskLevel: level,
+          riskLabel: riskInfo.label,
+          riskColor: riskInfo.color,
+          summary: geminiResult.summary || '',
+          findings: aiFindings.length > 0 ? aiFindings : allFindings.slice(0, 8),
+          apisUsed,
+          timestamp: Date.now()
+        };
+      }
+    } catch { /* Gemini falhou, usar fallback */ }
+  }
+
+  // ====== FALLBACK: heurísticas determinam o nível ======
+  let fallbackLevel;
+  if (fallbackScore >= 75) fallbackLevel = 'critico';
+  else if (fallbackScore >= 55) fallbackLevel = 'alto';
+  else if (fallbackScore >= 35) fallbackLevel = 'medio';
+  else if (fallbackScore >= 15) fallbackLevel = 'baixo';
+  else fallbackLevel = 'seguro';
+
+  const riskInfo = RISK_LEVELS[fallbackLevel];
+
+  // Gerar resumo automático a partir dos findings
+  const criticalFindings = allFindings.filter(f => f.severity === 'critical' || f.severity === 'high');
+  let autoSummary = '';
+  if (criticalFindings.length > 0) {
+    autoSummary = `Foram detectados ${criticalFindings.length} alerta(s) importante(s) neste site. ${criticalFindings[0].message}.`;
+  } else if (allFindings.length > 0) {
+    autoSummary = `Análise baseada em heurísticas locais. ${allFindings.filter(f => f.severity !== 'positive' && f.severity !== 'info').length} ponto(s) de atenção encontrado(s).`;
   } else {
-    riskLevel = 'safe'; riskLabel = 'SEGURO — Aparentemente Legítimo'; riskColor = '#16a34a';
+    autoSummary = 'Nenhum sinal de risco detectado pelas verificações locais.';
+  }
+
+  if (!apiKeys.gemini) {
+    autoSummary += ' Configure a API Gemini nas configurações para análise inteligente por IA.';
   }
 
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4, positive: 5 };
   allFindings.sort((a, b) => (severityOrder[a.severity] || 4) - (severityOrder[b.severity] || 4));
 
   return {
-    url: analyses.url,
-    domain: analyses.domain,
-    title: analyses.title,
-    score: finalScore,
-    riskLevel, riskLabel, riskColor,
-    findings: allFindings,
-    aiSummary: analyses.aiAnalysis?.summary || null,
-    aiRecommendation: analyses.aiAnalysis?.recommendation || null,
-    breakdown: {
-      url: analyses.urlAnalysis?.score || 0,
-      content: analyses.contentAnalysis?.score || 0,
-      domain: analyses.domainAnalysis?.score || 0,
-      security: analyses.securityAnalysis?.score || 0,
-      forms: analyses.formAnalysis?.score || 0,
-      external: analyses.externalChecks?.score || 0,
-      virusTotal: analyses.virusTotalCheck?.score || 0,
-      ai: analyses.aiAnalysis?.score || 0
-    },
-    timestamp: analyses.timestamp
+    url: allData.url, domain: allData.domain, title: allData.title,
+    riskLevel: fallbackLevel,
+    riskLabel: riskInfo.label,
+    riskColor: riskInfo.color,
+    summary: autoSummary,
+    findings: allFindings.slice(0, 10),
+    apisUsed,
+    timestamp: Date.now()
   };
+}
+
+// ============================================================================
+// DOSSIÊ PARA O GEMINI
+// ============================================================================
+
+function buildDossier(allData, allFindings) {
+  // Resumir dados de cada API
+  const safeBrowsing = allData.externalChecks?.findings
+    ?.filter(f => f.severity !== 'info')
+    ?.map(f => f.message).join('; ') || 'Não verificado';
+
+  const virusTotal = allData.virusTotalCheck?.findings
+    ?.filter(f => f.severity !== 'info')
+    ?.map(f => f.message).join('; ') || 'Não verificado';
+
+  const whois = allData.domainAnalysis?.findings
+    ?.filter(f => f.severity !== 'info')
+    ?.map(f => f.message).join('; ') || 'Não verificado';
+
+  const heuristicSummary = allFindings
+    .filter(f => f.severity === 'critical' || f.severity === 'high' || f.severity === 'medium')
+    .slice(0, 10)
+    .map(f => `[${f.severity.toUpperCase()}] ${f.message}`)
+    .join('\n');
+
+  return `Você é um analista de segurança cibernética. Analise este dossiê e dê seu veredito.
+
+SITE ANALISADO:
+URL: ${allData.url}
+Domínio: ${allData.domain}
+Título: ${allData.title || 'sem título'}
+
+RESULTADOS DAS VERIFICAÇÕES:
+
+1. Google Safe Browsing: ${safeBrowsing}
+2. VirusTotal (70+ antivírus): ${virusTotal}
+3. WHOIS (dados do domínio): ${whois}
+
+4. Alertas das heurísticas locais:
+${heuristicSummary || 'Nenhum alerta relevante.'}
+
+TAREFA:
+Com base em TODOS os dados acima, determine o nível de risco deste site.
+Considere especialmente: BETs falsas, phishing bancário, lojas fraudulentas, e golpes comuns no Brasil.
+
+Responda SÓ com JSON (sem markdown, sem backticks):
+{"riskLevel":"seguro|baixo|medio|alto|critico","summary":"<2-3 frases explicando o veredito para um leigo>","findings":[{"severity":"critical|high|medium|low|positive","message":"<fato objetivo>"}]}`;
+}
+
+async function callGeminiJudgment(prompt, apiKey) {
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        if (attempt > 0) await sleep(2000);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 600 }
+            })
+          }
+        );
+        if (response.status === 429) { if (attempt === 1) break; continue; }
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        if (data?.candidates?.[0]?.finishReason === 'SAFETY') return null;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return parseAIResponse(text);
+      } catch { if (attempt === 1) break; }
+    }
+  }
+  return null;
 }
 
 // ============================================================================
@@ -1221,7 +1356,23 @@ function consolidateResults(analyses) {
 
 async function getSettings() {
   return new Promise(resolve => {
-    chrome.storage.local.get('settings', (data) => resolve(data.settings || {}));
+    chrome.storage.local.get('settings', (data) => {
+      const settings = data.settings || {};
+      const userKeys = settings.apiKeys || {};
+
+      // Merge: chaves do usuário têm prioridade, embutidas são fallback
+      if (typeof getEmbeddedKeys === 'function') {
+        const embedded = getEmbeddedKeys();
+        settings.apiKeys = {
+          gemini: userKeys.gemini || embedded.gemini || '',
+          safeBrowsing: userKeys.safeBrowsing || embedded.safeBrowsing || '',
+          virusTotal: userKeys.virusTotal || embedded.virusTotal || '',
+          whois: userKeys.whois || embedded.whois || ''
+        };
+      }
+
+      resolve(settings);
+    });
   });
 }
 
@@ -1229,7 +1380,7 @@ function saveToHistory(result) {
   chrome.storage.local.get('history', (data) => {
     const history = data.history || [];
     history.unshift({
-      url: result.url, domain: result.domain, score: result.score,
+      url: result.url, domain: result.domain,
       riskLevel: result.riskLevel, riskLabel: result.riskLabel, timestamp: result.timestamp
     });
     if (history.length > 100) history.splice(100);

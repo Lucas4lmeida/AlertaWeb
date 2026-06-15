@@ -17,16 +17,15 @@ const DOM = {
   siteUrl: $('#site-url'),
   siteFavicon: $('#site-favicon'),
   btnAnalyze: $('#btn-analyze'),
+  btnScanEmail: $('#btn-scan-email'),
   loadingState: $('#loading-state'),
   loadingSteps: $('#loading-steps'),
   resultContainer: $('#result-container'),
-  scoreRingFill: $('#score-ring-fill'),
-  scoreNumber: $('#score-number'),
-  riskBadge: $('#risk-badge'),
-  aiSummary: $('#ai-summary'),
-  aiText: $('#ai-text'),
-  aiRecommendation: $('#ai-recommendation'),
-  breakdownBars: $('#breakdown-bars'),
+  riskLevelBadge: $('#risk-level-badge'),
+  riskIcon: $('#risk-icon'),
+  riskText: $('#risk-text'),
+  summaryText: $('#summary-text'),
+  apisUsed: $('#apis-used'),
   findingsList: $('#findings-list'),
   btnReport: $('#btn-report'),
   btnReanalyze: $('#btn-reanalyze'),
@@ -46,7 +45,6 @@ let currentTabId = null;
 let currentUrl = '';
 // FIX #7 e #9: Referências explícitas para cleanup de timers/animações
 let loadingInterval = null;
-let scoreAnimationId = null;
 
 // ============================================================================
 // INICIALIZAÇÃO
@@ -69,7 +67,14 @@ async function initializePopup() {
       DOM.siteUrl.textContent = currentUrl.length > 50
         ? currentUrl.substring(0, 50) + '...'
         : currentUrl;
-      DOM.siteFavicon.innerHTML = `<img src="https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32" alt="" onerror="this.style.display='none'"/>`;
+
+      // FIX #1/#2: usar createElement ao invés de innerHTML (CSP + XSS safe)
+      const faviconImg = document.createElement('img');
+      faviconImg.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url.hostname)}&sz=32`;
+      faviconImg.alt = '';
+      faviconImg.addEventListener('error', () => { faviconImg.style.display = 'none'; });
+      DOM.siteFavicon.textContent = '';
+      DOM.siteFavicon.appendChild(faviconImg);
     } catch {
       DOM.siteDomain.textContent = 'Página local ou interna';
       DOM.siteUrl.textContent = currentUrl;
@@ -90,6 +95,15 @@ async function initializePopup() {
       DOM.btnAnalyze.disabled = true;
       DOM.btnAnalyze.textContent = 'Não disponível para esta página';
     }
+
+    // Detectar webmail e mostrar botão de scan de email
+    const WEBMAIL_DOMAINS = ['mail.google.com', 'outlook.live.com', 'outlook.office.com', 'outlook.office365.com', 'mail.yahoo.com'];
+    try {
+      const hostname = new URL(currentUrl).hostname;
+      if (WEBMAIL_DOMAINS.includes(hostname)) {
+        DOM.btnScanEmail.classList.remove('hidden');
+      }
+    } catch { /* URL inválida */ }
   }
 
   loadSettings();
@@ -109,6 +123,7 @@ function attachEventListeners() {
   DOM.btnBackHistory.addEventListener('click', () => switchView('main'));
   DOM.btnClearHistory.addEventListener('click', clearHistory);
   DOM.btnAnalyze.addEventListener('click', () => startAnalysis(false));
+  DOM.btnScanEmail.addEventListener('click', startEmailScan);
   DOM.btnReanalyze.addEventListener('click', () => {
     DOM.resultContainer.classList.add('hidden');
     startAnalysis(true);  // forçar reanálise, ignorando cache
@@ -174,6 +189,107 @@ async function startAnalysis(forceReanalyze = false) {
   }
 }
 
+async function startEmailScan() {
+  if (!currentTabId) return;
+
+  DOM.btnScanEmail.classList.add('hidden');
+  DOM.btnAnalyze.classList.add('hidden');
+  DOM.resultContainer.classList.add('hidden');
+  DOM.loadingState.classList.remove('hidden');
+
+  try {
+    // 1. Análise local via email-scanner.js
+    const localResult = await new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(currentTabId, { action: 'scanEmailFromPopup' }, (resp) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error('Scanner de email não disponível. Recarregue a página.'));
+          return;
+        }
+        if (resp?.success) resolve(resp.result);
+        else reject(new Error(resp?.error || 'Nenhum email aberto detectado.'));
+      });
+    });
+
+    // 2. Mostrar resultado local imediatamente
+    DOM.loadingState.classList.add('hidden');
+    displayResults({
+      riskLevel: localResult.riskLevel,
+      riskLabel: localResult.riskLabel,
+      riskColor: localResult.riskColor,
+      summary: localResult.emailInfo
+        ? `De: ${localResult.emailInfo.sender || '?'} | ${localResult.emailInfo.linkCount || 0} link(s). Verificando APIs...`
+        : 'Analisando...',
+      findings: localResult.findings,
+      apisUsed: []
+    });
+
+    // 3. Chamar APIs em background
+    if (localResult.rawEmailData) {
+      const apiTimeout = setTimeout(() => {
+        DOM.apisUsed.textContent = 'APIs não responderam (timeout).';
+      }, 20000);
+
+      chrome.runtime.sendMessage({
+        action: 'analyzeEmailWithAPIs',
+        emailData: localResult.rawEmailData
+      }, (apiResponse) => {
+        clearTimeout(apiTimeout);
+        if (chrome.runtime.lastError || !apiResponse?.success) {
+          DOM.apisUsed.textContent = 'APIs indisponíveis.';
+          return;
+        }
+
+        const apiResult = apiResponse.result;
+        const apiFindings = [...localResult.findings];
+        const apisUsed = [];
+
+        if (apiResult.linkResults?.length > 0) {
+          apisUsed.push('Safe Browsing', 'VirusTotal');
+          for (const lr of apiResult.linkResults) {
+            if (lr.safeBrowsing?.isMalicious)
+              apiFindings.push({ severity: 'critical', message: 'Safe Browsing: link na lista negra' });
+            if (lr.virusTotal?.malicious > 0)
+              apiFindings.push({ severity: 'high', message: `VirusTotal: link detectado por ${lr.virusTotal.malicious} antivírus` });
+          }
+        }
+
+        if (apiResult.aiAnalysis) {
+          apisUsed.push('Gemini IA');
+          const ai = apiResult.aiAnalysis;
+          if (ai.findings) apiFindings.push(...ai.findings.map(f => ({ severity: f.severity || 'medium', message: f.message })));
+
+          // Se Gemini deu veredito, usar como principal
+          if (ai.riskLevel) {
+            const RISK_COLORS = { seguro: '#16a34a', baixo: '#65a30d', medio: '#d97706', alto: '#ea580c', critico: '#dc2626' };
+            const RISK_LABELS = { seguro: 'Seguro', baixo: 'Baixo', medio: 'Médio', alto: 'Alto', critico: 'Crítico' };
+            displayResults({
+              riskLevel: ai.riskLevel, riskLabel: RISK_LABELS[ai.riskLevel] || ai.riskLevel,
+              riskColor: RISK_COLORS[ai.riskLevel] || '#d97706',
+              summary: ai.summary || '', findings: apiFindings, apisUsed
+            });
+            return;
+          }
+        }
+
+        // Atualizar com dados das APIs
+        DOM.apisUsed.textContent = apisUsed.length > 0 ? 'Verificado por: ' + apisUsed.join(', ') : '';
+        DOM.summaryText.textContent = `De: ${localResult.rawEmailData.sender || '?'} | ${localResult.rawEmailData.urls?.length || 0} link(s) verificado(s).`;
+        if (apiFindings.length > localResult.findings.length) renderFindings(apiFindings);
+      });
+    }
+
+  } catch (error) {
+    DOM.loadingState.classList.add('hidden');
+    DOM.btnScanEmail.classList.remove('hidden');
+    DOM.btnAnalyze.classList.remove('hidden');
+    showToast(error.message);
+  }
+}
+
+function displayEmailResults(result) {
+  displayResults(result);
+}
+
 function cleanupLoading() {
   if (loadingInterval) {
     clearInterval(loadingInterval);
@@ -182,14 +298,10 @@ function cleanupLoading() {
 }
 
 function animateLoadingSteps() {
-  // FIX #7: Limpar intervalo anterior antes de criar novo
   cleanupLoading();
-
   const steps = DOM.loadingSteps.querySelectorAll('.step');
-  // Resetar todos os steps
   steps.forEach(s => s.classList.remove('active', 'done'));
   let current = 0;
-
   loadingInterval = setInterval(() => {
     if (current > 0 && current <= steps.length) {
       steps[current - 1].classList.remove('active');
@@ -198,9 +310,7 @@ function animateLoadingSteps() {
     if (current < steps.length) {
       steps[current].classList.add('active');
       current++;
-    } else {
-      cleanupLoading();
-    }
+    } else { cleanupLoading(); }
   }, 800);
 }
 
@@ -208,84 +318,38 @@ function animateLoadingSteps() {
 // EXIBIÇÃO DE RESULTADOS
 // ============================================================================
 
+const RISK_ICONS = {
+  seguro: '🛡️', baixo: '🔵', medio: '🟡', alto: '🟠', critico: '🔴',
+  safe: '🛡️', low: '🔵', medium: '🟡', high: '🟠', critical: '🔴'
+};
+
 function displayResults(result) {
   DOM.resultContainer.classList.remove('hidden');
 
-  animateScore(result.score, result.riskColor);
+  // Nível de risco
+  const level = result.riskLevel || 'seguro';
+  const color = result.riskColor || '#16a34a';
+  const label = result.riskLabel || 'Seguro';
 
-  DOM.riskBadge.textContent = result.riskLabel;
-  DOM.riskBadge.className = `risk-badge ${result.riskLevel}`;
+  DOM.riskLevelBadge.style.borderColor = color;
+  DOM.riskLevelBadge.style.background = color + '15';
+  DOM.riskIcon.textContent = RISK_ICONS[level] || '●';
+  DOM.riskText.textContent = label;
+  DOM.riskText.style.color = color;
 
-  if (result.aiSummary) {
-    DOM.aiSummary.classList.remove('hidden');
-    DOM.aiText.textContent = result.aiSummary;
-    DOM.aiRecommendation.textContent = result.aiRecommendation || '';
-    DOM.aiRecommendation.style.display = result.aiRecommendation ? '' : 'none';
+  // Resumo
+  DOM.summaryText.textContent = result.summary || '';
+
+  // APIs usadas
+  const apis = result.apisUsed || [];
+  if (apis.length > 0) {
+    DOM.apisUsed.textContent = 'Verificado por: ' + apis.join(', ');
   } else {
-    DOM.aiSummary.classList.add('hidden');
+    DOM.apisUsed.textContent = '';
   }
 
-  renderBreakdown(result.breakdown);
+  // Findings
   renderFindings(result.findings);
-}
-
-function animateScore(targetScore, color) {
-  // FIX #9: Cancelar animação anterior antes de iniciar nova
-  if (scoreAnimationId) {
-    cancelAnimationFrame(scoreAnimationId);
-    scoreAnimationId = null;
-  }
-
-  const circumference = 326.7;
-  const offset = circumference - (circumference * targetScore / 100);
-
-  DOM.scoreRingFill.style.stroke = color;
-  setTimeout(() => { DOM.scoreRingFill.style.strokeDashoffset = offset; }, 100);
-
-  const duration = 1500;
-  const startTime = performance.now();
-
-  function animate(now) {
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    DOM.scoreNumber.textContent = Math.round(eased * targetScore);
-    DOM.scoreNumber.style.color = color;
-
-    if (progress < 1) {
-      scoreAnimationId = requestAnimationFrame(animate);
-    } else {
-      scoreAnimationId = null;
-    }
-  }
-
-  scoreAnimationId = requestAnimationFrame(animate);
-}
-
-function renderBreakdown(breakdown) {
-  const labels = {
-    url: 'URL', content: 'Conteúdo', domain: 'Domínio', security: 'Segurança',
-    forms: 'Formulários', external: 'Reputação', virusTotal: 'VirusTotal', ai: 'IA'
-  };
-
-  DOM.breakdownBars.innerHTML = '';
-
-  for (const [key, value] of Object.entries(breakdown)) {
-    const color = getScoreColor(value);
-    const row = document.createElement('div');
-    row.className = 'breakdown-row';
-    row.innerHTML = `
-      <span class="breakdown-label">${labels[key] || key}</span>
-      <div class="breakdown-bar-wrapper">
-        <div class="breakdown-bar-fill" style="background: ${color};" data-width="${value}%"></div>
-      </div>
-      <span class="breakdown-value" style="color: ${color};">${value}</span>
-    `;
-    DOM.breakdownBars.appendChild(row);
-    setTimeout(() => {
-      row.querySelector('.breakdown-bar-fill').style.width = `${value}%`;
-    }, 200);
-  }
 }
 
 function renderFindings(findings) {
@@ -372,8 +436,9 @@ function renderHistory(history) {
   history.forEach(item => {
     const div = document.createElement('div');
     div.className = 'history-item';
+    const icon = RISK_ICONS[item.riskLevel] || '●';
     div.innerHTML = `
-      <div class="history-score ${item.riskLevel}">${item.score}</div>
+      <div class="history-score ${item.riskLevel}">${icon}</div>
       <div class="history-details">
         <div class="history-domain">${escapeHtml(item.domain)}</div>
         <div class="history-meta">${escapeHtml(item.riskLabel)} · ${formatTimeAgo(item.timestamp)}</div>
@@ -396,14 +461,6 @@ function clearHistory() {
 // ============================================================================
 // UTILIDADES
 // ============================================================================
-
-function getScoreColor(score) {
-  if (score >= 75) return '#ef4444';
-  if (score >= 50) return '#f97316';
-  if (score >= 25) return '#eab308';
-  if (score >= 10) return '#84cc16';
-  return '#22c55e';
-}
 
 function getFindingIcon(severity) {
   return { critical: '🚨', high: '⚠️', medium: '🔶', low: '🔸', positive: '✅', info: 'ℹ️' }[severity] || '•';

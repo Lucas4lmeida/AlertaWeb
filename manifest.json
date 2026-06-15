@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AlertaWeb — Detector de Golpes",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Analisa páginas web em tempo real para detectar golpes, fraudes e phishing usando IA e heurísticas avançadas.",
   "permissions": [
     "activeTab",
@@ -9,8 +9,12 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://*/*",
-    "http://*/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://safebrowsing.googleapis.com/*",
+    "https://www.virustotal.com/*",
+    "https://api.ip2whois.com/*",
+    "https://www.google.com/s2/favicons*",
+    "https://*/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -27,6 +31,18 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://mail.yahoo.com/*"
+      ],
+      "js": ["email-scanner.js"],
+      "css": ["email-scanner.css"],
       "run_at": "document_idle"
     }
   ],

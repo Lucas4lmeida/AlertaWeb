@@ -257,6 +257,15 @@ body::-webkit-scrollbar-thumb {
   box-shadow: none;
 }
 
+.btn-email {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+  margin-top: 0;
+}
+.btn-email:hover {
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.45);
+}
+
 /* ============================================================================
    LOADING STATE
    ============================================================================ */
@@ -331,143 +340,65 @@ body::-webkit-scrollbar-thumb {
 }
 
 /* ============================================================================
-   RESULT — SCORE RING
+   RESULT — RISK LEVEL
    ============================================================================ */
 
 .result-container {
   padding: 18px;
 }
 
-.score-section {
+.risk-section {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.risk-level-badge {
+  display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 10px;
+  padding: 14px 24px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--accent-safe);
+  background: var(--accent-safe-bg);
+  transition: all 0.4s ease;
 }
 
-.score-ring {
-  position: relative;
-  width: 120px;
-  height: 120px;
-}
-
-.score-ring svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.score-ring-bg {
-  fill: none;
-  stroke: var(--bg-tertiary);
-  stroke-width: 6;
-}
-
-.score-ring-fill {
-  fill: none;
-  stroke: var(--accent-safe);
-  stroke-width: 6;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1),
-              stroke 0.5s ease;
-}
-
-.score-value {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.score-number {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -1px;
+.risk-icon {
+  font-size: 24px;
   line-height: 1;
 }
 
-.score-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  display: block;
-}
-
-.risk-badge {
-  margin-top: 10px;
-  padding: 5px 14px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
+.risk-text {
+  font-size: 20px;
+  font-weight: 800;
   letter-spacing: 0.5px;
-}
-
-.risk-badge.safe {
-  background: var(--accent-safe-bg);
-  color: var(--accent-safe);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-}
-.risk-badge.low {
-  background: var(--accent-low-bg);
-  color: var(--accent-low);
-  border: 1px solid rgba(132, 204, 22, 0.2);
-}
-.risk-badge.medium {
-  background: var(--accent-medium-bg);
-  color: var(--accent-medium);
-  border: 1px solid rgba(234, 179, 8, 0.2);
-}
-.risk-badge.high {
-  background: var(--accent-high-bg);
-  color: var(--accent-high);
-  border: 1px solid rgba(249, 115, 22, 0.2);
-}
-.risk-badge.critical {
-  background: var(--accent-critical-bg);
-  color: var(--accent-critical);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  text-transform: uppercase;
 }
 
 /* ============================================================================
-   AI SUMMARY
+   SUMMARY
    ============================================================================ */
 
-.ai-summary {
+.summary-section {
   background: var(--bg-secondary);
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.ai-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-blue);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.ai-text {
+.summary-text {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
   margin-bottom: 8px;
 }
 
-.ai-recommendation {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  padding: 8px 12px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--accent-blue);
+.apis-used {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 /* ============================================================================
@@ -803,17 +734,17 @@ body::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 700;
   flex-shrink: 0;
   border: 2px solid;
 }
 
-.history-score.safe { color: var(--accent-safe); border-color: var(--accent-safe); background: var(--accent-safe-bg); }
-.history-score.low { color: var(--accent-low); border-color: var(--accent-low); background: var(--accent-low-bg); }
-.history-score.medium { color: var(--accent-medium); border-color: var(--accent-medium); background: var(--accent-medium-bg); }
-.history-score.high { color: var(--accent-high); border-color: var(--accent-high); background: var(--accent-high-bg); }
-.history-score.critical { color: var(--accent-critical); border-color: var(--accent-critical); background: var(--accent-critical-bg); }
+.history-score.safe, .history-score.seguro { color: var(--accent-safe); border-color: var(--accent-safe); background: var(--accent-safe-bg); }
+.history-score.low, .history-score.baixo { color: var(--accent-low); border-color: var(--accent-low); background: var(--accent-low-bg); }
+.history-score.medium, .history-score.medio { color: var(--accent-medium); border-color: var(--accent-medium); background: var(--accent-medium-bg); }
+.history-score.high, .history-score.alto { color: var(--accent-high); border-color: var(--accent-high); background: var(--accent-high-bg); }
+.history-score.critical, .history-score.critico { color: var(--accent-critical); border-color: var(--accent-critical); background: var(--accent-critical-bg); }
 
 .history-details {
   flex: 1;

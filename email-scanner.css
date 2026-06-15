@@ -1,0 +1,223 @@
+/* ============================================================================
+   AlertaWeb — Email Scanner Styles
+   Banner, tooltips, e destaque de links
+   ============================================================================ */
+
+/* ============================================================================
+   BANNER
+   ============================================================================ */
+
+.aw-email-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483647; /* FIX #8: max z-index para ficar acima de headers do Gmail/Outlook */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  animation: aw-slide-down 0.3s ease;
+}
+
+@keyframes aw-slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.aw-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+.aw-banner-icon { font-size: 16px; flex-shrink: 0; }
+
+.aw-banner-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.aw-banner-score {
+  opacity: 0.7;
+  font-weight: normal;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.aw-banner-toggle {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: inherit;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.aw-banner-toggle:hover { background: rgba(255,255,255,0.25); }
+
+.aw-banner-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.aw-banner-close:hover { opacity: 1; }
+
+/* Cores por nível */
+.aw-banner-safe {
+  background: #16a34a;
+  color: white;
+}
+.aw-banner-warning {
+  background: #d97706;
+  color: white;
+}
+.aw-banner-danger {
+  background: #dc2626;
+  color: white;
+}
+
+/* Detalhes expandíveis */
+.aw-banner-details {
+  padding: 8px 16px 12px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.aw-finding {
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(0,0,0,0.15);
+  border-left: 3px solid rgba(255,255,255,0.4);
+}
+.aw-finding-critical { border-left-color: #fca5a5; background: rgba(0,0,0,0.25); }
+.aw-finding-high { border-left-color: #fdba74; }
+.aw-finding-medium { border-left-color: #fde68a; }
+
+/* ============================================================================
+   LINK TOOLTIPS
+   ============================================================================ */
+
+.aw-link-tooltip {
+  position: absolute;
+  z-index: 2147483646;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  max-width: 400px;
+  min-width: 220px;
+  overflow: hidden;
+  animation: aw-fade-in 0.15s ease;
+  pointer-events: none;
+}
+
+@keyframes aw-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.aw-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.aw-tooltip-safe { background: #16a34a; color: white; }
+.aw-tooltip-warning { background: #d97706; color: white; }
+.aw-tooltip-danger { background: #dc2626; color: white; }
+
+.aw-tooltip-body {
+  padding: 8px 10px;
+}
+
+.aw-tooltip-label {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.aw-tooltip-url {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #7dd3fc;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.aw-tooltip-mismatch {
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(220, 38, 38, 0.15);
+  border-radius: 4px;
+  border-left: 3px solid #ef4444;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.aw-tooltip-mismatch strong {
+  color: #fca5a5;
+}
+
+/* ============================================================================
+   DESTAQUE DE LINKS
+   ============================================================================ */
+
+a.aw-link-scanned {
+  position: relative;
+}
+
+a.aw-link-suspicious {
+  outline: 2px dashed #d97706 !important;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+a.aw-link-dangerous {
+  outline: 2px solid #dc2626 !important;
+  outline-offset: 2px;
+  border-radius: 2px;
+  background: rgba(220, 38, 38, 0.08) !important;
+}
+
+/* ============================================================================
+   INBOX INDICATORS
+   ============================================================================ */
+
+.aw-inbox-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  cursor: help;
+  filter: drop-shadow(0 0 2px rgba(217, 119, 6, 0.5));
+  animation: aw-pulse 2s ease-in-out infinite;
+}
+
+@keyframes aw-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}

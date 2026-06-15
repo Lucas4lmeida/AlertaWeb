@@ -24,7 +24,7 @@ git clone https://github.com/SEU_USUARIO/alertaweb.git
 
 ## O que analisa
 
-A extensão executa 8 verificações em paralelo ao clicar em "Analisar":
+### Páginas web (8 verificações)
 
 - **URL** — HTTPS, TLD suspeito, typosquatting
 - **Conteúdo** — linguagem de urgência, promessas falsas, timers de pressão
@@ -36,6 +36,20 @@ A extensão executa 8 verificações em paralelo ao clicar em "Analisar":
 - **IA (Gemini)** — análise inteligente contextual
 
 Sites conhecidos (Google, WhatsApp, bancos, etc.) são reconhecidos automaticamente via whitelist.
+
+### Emails (scanner automático)
+
+Funciona no Gmail, Outlook.com, Outlook 365 e Yahoo Mail. Ao abrir um email, analisa automaticamente:
+
+- **Link mismatch** — texto mostra um domínio, href aponta outro
+- **Remetente suspeito** — typosquatting de marcas conhecidas (nubank, itau, etc.)
+- **Linguagem de phishing** — "sua conta será bloqueada", "confirme seus dados", etc.
+- **Anexos perigosos** — menções a .exe, .scr, .bat e outros
+- **Urgência + dados sensíveis** — combinação clássica de phishing
+- **Links perigosos** — encurtadores, IPs numéricos, cruzamento com Safe Browsing e VirusTotal
+- **Tooltips nos links** — passe o mouse sobre qualquer link para ver o destino real
+
+Mostra um banner no topo do email: verde (seguro), amarelo (atenção) ou vermelho (phishing).
 
 ## APIs (todas gratuitas)
 
@@ -58,16 +72,16 @@ Configure clicando em ⚙️ na extensão. Funciona sem APIs (usando heurística
 | 75-89 | Alto |
 | 90-100 | Crítico |
 
-APIs não configuradas são excluídas do cálculo. O score final nunca fica abaixo de 70% do módulo mais alto (evita diluição).
-
 ## Estrutura
 
 ```
 alertaweb/
 ├── manifest.json
-├── background.js      # Motor de análise
-├── content.js         # Extração de dados da página
-├── popup.html / .js   # Interface
+├── background.js        # Motor de análise
+├── content.js           # Extração de dados da página
+├── email-scanner.js     # Scanner de emails (Gmail, Outlook, Yahoo)
+├── email-scanner.css    # Estilos do scanner (banner, tooltips)
+├── popup.html / .js     # Interface
 ├── styles.css
 └── icons/
 ```

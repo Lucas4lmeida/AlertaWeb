@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>AlertaWeb — Codificador de Chaves</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0e17; color: #e8ecf4; font-family: 'Segoe UI', sans-serif; padding: 30px; max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 6px; }
+    .sub { color: #8899b2; font-size: 13px; margin-bottom: 24px; }
+    .group { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: #8899b2; margin-bottom: 4px; font-weight: 600; }
+    input { width: 100%; padding: 10px; background: #111827; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e8ecf4; font-family: monospace; font-size: 13px; }
+    input:focus { outline: none; border-color: #3b82f6; }
+    button { background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; margin: 16px 0; }
+    button:hover { background: #2563eb; }
+    .result { background: #111827; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px; margin-top: 16px; display: none; }
+    .result.visible { display: block; }
+    .result pre { font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; color: #7dd3fc; }
+    .result h3 { font-size: 14px; margin-bottom: 8px; }
+    .instructions { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: #93c5fd; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Codificador de Chaves API</h1>
+  <p class="sub">Cole suas chaves, clique em codificar, e copie o resultado para o arquivo keys.js</p>
+
+  <div class="instructions">
+    <strong>Passo a passo:</strong><br/>
+    1. Cole suas chaves de API nos campos abaixo<br/>
+    2. Clique em "Codificar"<br/>
+    3. Copie o bloco gerado<br/>
+    4. Abra o arquivo <code>keys.js</code> e substitua os valores vazios<br/>
+    5. Recarregue a extensão no Chrome
+  </div>
+
+  <div class="group">
+    <label>Gemini API Key</label>
+    <input type="text" id="key-gemini" placeholder="AIza..."/>
+  </div>
+  <div class="group">
+    <label>Google Safe Browsing API Key</label>
+    <input type="text" id="key-safebrowsing" placeholder="AIza..."/>
+  </div>
+  <div class="group">
+    <label>VirusTotal API Key</label>
+    <input type="text" id="key-virustotal" placeholder="abc123..."/>
+  </div>
+  <div class="group">
+    <label>IP2WHOIS API Key</label>
+    <input type="text" id="key-whois" placeholder="abc123..."/>
+  </div>
+
+  <button id="btn-encode">Codificar Chaves</button>
+
+  <div class="result" id="result">
+    <h3>Copie e cole no keys.js:</h3>
+    <pre id="result-code"></pre>
+  </div>
+
+<script>
+const KEY = 'AlertaWeb2026';
+
+function encode(text) {
+  if (!text) return '';
+  let encoded = '';
+  for (let i = 0; i < text.length; i++) {
+    encoded += String.fromCharCode(text.charCodeAt(i) ^ KEY.charCodeAt(i % KEY.length));
+  }
+  return btoa(encoded);
+}
+
+document.getElementById('btn-encode').addEventListener('click', () => {
+  const gemini = encode(document.getElementById('key-gemini').value.trim());
+  const safeBrowsing = encode(document.getElementById('key-safebrowsing').value.trim());
+  const virusTotal = encode(document.getElementById('key-virustotal').value.trim());
+  const whois = encode(document.getElementById('key-whois').value.trim());
+
+  const code = `const EMBEDDED_KEYS = {
+  gemini: '${gemini}',
+  safeBrowsing: '${safeBrowsing}',
+  virusTotal: '${virusTotal}',
+  whois: '${whois}'
+};`;
+
+  document.getElementById('result-code').textContent = code;
+  document.getElementById('result').classList.add('visible');
+});
+</script>
+</body>
+</html>

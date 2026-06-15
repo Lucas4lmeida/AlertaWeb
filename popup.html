@@ -57,6 +57,14 @@
         Analisar esta Página
       </button>
 
+      <button id="btn-scan-email" class="btn-analyze btn-email hidden">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+        Escanear Email Aberto
+      </button>
+
       <!-- Loading State -->
       <div id="loading-state" class="loading-state hidden">
         <div class="loading-ring">
@@ -75,44 +83,21 @@
 
       <!-- Resultado da Análise -->
       <div id="result-container" class="result-container hidden">
-        <!-- Score circular -->
-        <div class="score-section">
-          <div class="score-ring" id="score-ring">
-            <svg viewBox="0 0 120 120">
-              <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
-              <circle class="score-ring-fill" id="score-ring-fill" cx="60" cy="60" r="52"
-                stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
-            </svg>
-            <div class="score-value">
-              <span class="score-number" id="score-number">0</span>
-              <span class="score-label">/ 100</span>
-            </div>
+        <!-- Nível de Risco -->
+        <div class="risk-section">
+          <div class="risk-level-badge" id="risk-level-badge">
+            <span class="risk-icon" id="risk-icon">●</span>
+            <span class="risk-text" id="risk-text">Analisando...</span>
           </div>
-          <div class="risk-badge" id="risk-badge">Analisando...</div>
         </div>
 
-        <!-- Resumo IA -->
-        <div class="ai-summary hidden" id="ai-summary">
-          <div class="ai-header">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
-              <path d="M18 14a6 6 0 0 1-12 0"/>
-              <path d="M12 20v2"/>
-              <path d="M8 22h8"/>
-            </svg>
-            Análise por IA
-          </div>
-          <p class="ai-text" id="ai-text"></p>
-          <p class="ai-recommendation" id="ai-recommendation"></p>
+        <!-- Resumo da Análise -->
+        <div class="summary-section" id="summary-section">
+          <p class="summary-text" id="summary-text"></p>
+          <div class="apis-used" id="apis-used"></div>
         </div>
 
-        <!-- Breakdown de scores -->
-        <div class="breakdown-section">
-          <h3 class="section-title">Análise Detalhada</h3>
-          <div class="breakdown-bars" id="breakdown-bars"></div>
-        </div>
-
-        <!-- Findings -->
+        <!-- Descobertas -->
         <div class="findings-section">
           <h3 class="section-title">Descobertas</h3>
           <div class="findings-list" id="findings-list"></div>
