@@ -13,8 +13,7 @@
     "https://safebrowsing.googleapis.com/*",
     "https://www.virustotal.com/*",
     "https://api.ip2whois.com/*",
-    "https://www.google.com/s2/favicons*",
-    "https://*/*"
+    "https://www.google.com/s2/favicons*"
   ],
   "action": {
     "default_popup": "popup.html",
