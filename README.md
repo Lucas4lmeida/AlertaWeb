@@ -15,7 +15,7 @@
 ## Instalação
 
 ```bash
-git clone https://github.com/SEU_USUARIO/alertaweb.git
+git clone https://github.com/Lucas4lmeida/AlertaWeb.git
 ```
 
 1. Acesse `chrome://extensions/`
